@@ -9,10 +9,19 @@ setwd("C:/Users/Lapei_Cigets/Desktop/RFB2024")
 
 # lendo dados ----
 
-# Leitura de estabelecimento
+# Leitura de base estabelecimento
+
+# vamos ler apenas as variaveis importantes, como o ID
+# de CNPJ (V1), a UF (V20), a identificacao de matriz ou filial (V4), 
+# situacao cadastral (V6), Data de inicio da atividade (11),
+# CNAE (12), municipio (V21)
 
 estab0 <- fread("estab0.ESTABELE", select=c(1, 2, 3, 4, 5, 6, 7,
                                            11, 12, 20, 21)) 
+
+
+# logo depois de fazer a leitura, ja fazemos o filtro para manter
+# empresas ativas, em Goias e matriz
 
 estab0 <- estab0[V6 == 2 & V20 == "GO" & V4 == 1, ]
 
@@ -93,10 +102,26 @@ rm(estab0,
    estab8,
    estab9)
 
-#write.csv(estabelecimentos_ativos_go,
-#          "estabelecimentos_ativos_go.csv")
+#Fazendo os tratamentos, mantivemos 856110 observacoes de 
+#empresas goianas, matrizes que estão ativas no estado
+
+
+# Estabelecimentos ativos -------------------------------------------------
+
+# write.csv(estabelecimentos_ativos_go,
+#          "estabelecimentos_ativos_go_2024.csv")
+
 
 # Empresas leitura -----
+
+# vamos ler outra estrutura de dados - empresa. 
+# Vamos pegar as variaveis CPNJ (V1), razao social (V2)
+# e natureza jurídica (V3). Nesta base, conseguimos
+# acessar a natureza jurídica dos empreendimentos 
+# a partir da V3 = 2135
+
+# fazemos um tratamento separado das ME e das não ME devido à variável
+# socios que temos em uma tabela separada para as ME
 
 # mantendo so ME (microempresas) por enquanto
 
@@ -159,9 +184,11 @@ rm(emp0,
    emp8,
    emp9)
 
-# write.csv(me, "microempresas.csv")
+#write.csv(me, "microempresas2024.csv")
 #arrow::write_parquet(me, "microempresas.parquet")
 
+
+# em seguida fazemos a leitura das
 # empresas nao-ME e com fins lucrativos
 
 
@@ -234,10 +261,14 @@ rm(emp0_naome,
    emp8_naome,
    emp9_naome)
 
-# write.csv(nao_me, "nao_microempresas.csv")
+# write.csv(nao_me, "nao_microempresas24.csv")
 # arrow::write_parquet(nao_me, "nao_microempresas.parquet")
 
 # Socios ----
+
+# baixando so os dados de socios, o que inclui cnpj (V1), 
+# identificador do socio (V2). Nome do socio (V3)
+# qualificacao do socio (V5) e data de entrada na sociedade (V6)
 
 socios0 <- fread("socios0.SOCIOCSV", select = c(1, 2, 3, 5, 6))
 socios1 <- fread("socios1.SOCIOCSV", select = c(1, 2, 3, 5, 6))
@@ -261,7 +292,7 @@ socios <- rbind(socios0, socios1, socios2,
          qualificacao_socio = V5, 
          entrada_sociedade = V6)
 
-# write.csv(socios, "socios.csv")
+# write.csv(socios, "socios24.csv")
 # arrow::write_parquet(socios, "socios.parquet")
 
 rm(socios0, socios1, socios2, 
@@ -270,6 +301,8 @@ rm(socios0, socios1, socios2,
    socios9)
 
 # Tratamentos -------------------------------------------------------------
+
+# vamos fazer alguns tratamentos, como a identificacao do municipio
 
 municipios_serpro <- read_excel("C:/Users/Lapei_Cigets/Desktop/RFB2024/municipios_serpro.xlsx") |> 
                         filter(UF == "GO")
@@ -281,32 +314,12 @@ municipios_serpro$codigo_arrumado <- as.integer(municipios_serpro$codigo_arrumad
 ### atenção
 
 
-# todos_estabelecimentos_go <- fread("C:/Users/Lapei_Cigets/Desktop/RFB 09.2023/Estabelecimentos/todos_estabelecimentos_go.csv",
-#                                    select = c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)) 
-
-# todos_estabelecimentos_go <- 
-#   todos_estabelecimentos_go %>% 
-#   rename(cnpj_basico = V1, cnpj_ordem = V2, 
-#          cnpj_dv = V3, matriz = V4, nome_fantasia = V5, 
-#          situacao = V6, data_situacao_atual = V7, 
-#          data_inicio_atividade = V11, cnae = V12, uf = V20, 
-#          municipio = V21)
-
-# 
-# microempresas <- fread("C:/Users/Lapei_Cigets/Desktop/RFB 09.2023/Empresas/microempresas.csv", 
-#                        select = c(2, 3, 4), encoding = "Latin-1")
-
-
 me_todas <- estabelecimentos_ativos_go |> 
                   left_join(me, 
                             by = c("cnpj_basico"))
 
-#round(colSums(is.na(me_todas)))
-
-#me_todas$razao_social <- iconv(me_todas$razao_social, to = "latin1", from = "UTF-8")
-
 # esse tratamento foi feito para retirar numeros e outros caracteres que eventualmente
-# se encontravam no na variavel razao social
+# se encontravam no na variavel razao social o que poderia impedir classificar o genero
 
 me_tratado <- me_todas |> 
                       mutate(razao_social_t = gsub('[[:digit:]]+', '', razao_social)) |> 
@@ -314,7 +327,9 @@ me_tratado <- me_todas |>
                       mutate(razao_social_t = str_trim(razao_social_t)) |> 
                       mutate(genero = get_gender(razao_social_t))
 
-dist_empresas <- 
+# aqui sao algumas analises especificas as ME. Mas nem conta tanto
+
+dist_me_empresas <- 
   me_tratado |> 
   filter(nat_juridica == 2135) |> 
   group_by(genero) |> 
@@ -344,6 +359,9 @@ dist_me_tempo <- me_tratado |>
 #write.csv(distribuicao_municipios,"distribuicao_me.csv")
 
 #---- Tratamento das Nao-ME --------------
+
+# aqui temos um tratamento diferente, pois precisamos juntar com a 
+# tabela de socios tambem
 
 # nao_microempresas <- fread("C:/Users/Lapei_Cigets/Desktop/RFB 09.2023/Empresas/nao_microempresas.csv",
 #                            select = c(2, 3, 4))
@@ -377,10 +395,6 @@ nao_me_gender_3 <-
   nao_me_gender_2 |> 
     mutate(genero = get_gender(nome_socio))
 
-nao_me_gender_3 |> 
-  group_by(genero) |> 
-  count()
-
 nao_me_completa <- 
   nao_me_gender_3 |> 
   group_by(uf, municipio, genero) |> 
@@ -413,7 +427,8 @@ base_completa1 <-
   summarise(total = sum(n)) |> 
   mutate(freq = total/sum(total))
 
-#write.csv(base_completa1, "percentual_feminino_masculino.csv")
+#write.csv(base_completa1, "percentual_feminino_masculino24.csv")
+#writexl::write_xlsx(base_completa1, "percentual_feminino_masc24.xlsx")
 
 # taxa ------------------------------------------------------------------
 
@@ -441,7 +456,7 @@ base_completa3 <-
   select(cod_IBGE, genero, municipio_pad, genero, total, freq, 
          POPULACAO, taxa)
 
-#writexl::write_xlsx(base_completa3, "cap2_taxas.xlsx")
+#writexl::write_xlsx(base_completa3, "cap2_taxas24.xlsx")
 
 #### Continuar por aqui para ver o gráfico de evolução e para ver a tabela de CNAE
 #load("C:/Users/Lapei_Cigets/Desktop/RFB 09.2023/Resultados_capitulo2.RData")
@@ -473,43 +488,10 @@ dist_frequencia <-
   ungroup() |> 
   mutate(freq = prop.table(total), .by = ano) 
 
-a <- 
-  dist_frequencia |> 
-    ggplot(aes(x = ano, 
-               y = freq, 
-               col = genero)) + 
-    geom_line(size = 1) + 
-    geom_label(aes(label = round(freq, 2)),
-               size = 1.5, 
-               label.size = 0.10, 
-               alpha = 0.7,
-               vjust = -0.5) +
-    labs(
-      title = "Evolução de empreendedores com negócios ativos em Goiás",
-      subtitle = "Fonte: Receita Federal do Brasil",
-      x = "Ano",
-      y = "Frequência",
-      col = "Gênero"
-    ) +
-    scale_y_continuous(limits = c(0, 0.85)) +
-    scale_color_manual(values = c("Male" = "#1f78b4", 
-                                  "Female" = "#e31a1c"),
-                       labels = c("Male" = "Masculino", 
-                                  "Female" = "Feminino")) +
-    theme_minimal(base_size = 12) +
-    theme(
-      legend.position = "bottom",
-      panel.grid.minor = element_line(color = "gray90", linetype = "dotted"),
-      panel.grid.major = element_line(color = "gray80")
-    )
- 
-ggsave(plot = a, 
-       filename = "evolucao.jpeg", 
-       width = 10,
-       height = 4,
-       dpi = 300)
+#writexl::write_xlsx(dist_frequencia, "proporcoes_tempo_estado24.xlsx")
 
-# writexl::write_xlsx(dist_frequencia, "cap2_proporcoes_tempo_estado.xlsx")
+
+
   
 # CNAE
 
@@ -541,14 +523,6 @@ cnae <-
             by = c("municipio"="codigo_arrumado")) |>
   left_join(id_cnae, by = c("cnae"="cod_cnae")) 
 
-caldazinha <- cnae |> 
-                filter(Municipio == "CALDAZINHA")
-
-goiania <- cnae |> 
-              filter(Municipio == "GOIANIA")
-
-# |> 
-#  filter(genero == "Female")
 
 freq_cnae <- 
   cnae %>%
@@ -558,7 +532,7 @@ freq_cnae <-
   mutate(freq = prop.table(total), .by = nm_cnae)
 
 
-writexl::write_xlsx(freq_cnae, "cap2_cnae02_02_rev_div.xlsx")
+writexl::write_xlsx(freq_cnae, "cnae2024.xlsx")
 
 #writexl::write_xlsx(base_completa3, "analises_RFB_2023.xlsx")
 
