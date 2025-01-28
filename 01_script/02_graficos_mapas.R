@@ -10,7 +10,7 @@ setwd("C:/Users/Lapei_Cigets/Desktop/RFB2024/01_dfs_tratados")
 
 # distribuicao_frequencia
 
-dist_frequencia <- read_excel("01_dfs_tratados/proporcoes_tempo_estado24.xlsx")
+dist_frequencia <- read_excel("C:/Users/Lapei_Cigets/Desktop/RFB2024/01_dfs_tratados/proporcoes_tempo_estado24.xlsx")
 
 
 a <- 
@@ -96,6 +96,9 @@ taxa_evolucao <- taxas_evolucao |>
   mutate(ano = case_when(ano == "taxa24" ~ 2024,
                          ano == "taxa23" ~ 2023,
                          ano == "taxa22" ~ 2022)) 
+
+
+writexl::write_xlsx(taxa_evolucao, "evolucao_top10.xlsx")
 
 
 library(ggplot2)
